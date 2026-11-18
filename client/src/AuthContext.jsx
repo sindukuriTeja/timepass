@@ -3,7 +3,8 @@ import { io } from 'socket.io-client';
 
 const AuthContext = createContext(null);
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Connect to same origin in production (Render), localhost in dev
+const API_URL = import.meta.env.DEV ? 'http://localhost:5000' : '';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -37,7 +38,8 @@ export function AuthProvider({ children }) {
     });
 
     newSocket.on('new-message', (msg) => {
-      setActiveChat((prev) => (prev ? { ...prev, messages: [...(prev.messages || []), msg] } : null));
+      // Just notify that a message arrived; ChatPage manages its own message list
+      setActiveChat((prev) => prev);
     });
 
     newSocket.on('chat-exited', () => {

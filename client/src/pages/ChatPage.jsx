@@ -45,7 +45,7 @@ export default function ChatPage() {
       idleTimer = setTimeout(() => {
         if (socket) socket.emit('exit-chat');
         logout();
-        navigate('/');
+        navigate('/setup');
       }, IDLE_TIMEOUT);
     };
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click', 'sendMessage'];
@@ -60,7 +60,6 @@ export default function ChatPage() {
   const handleSend = () => {
     if (!message.trim()) return;
     sendMessage(message.trim());
-    setMessages((prev) => [...prev, { sender: user.username, text: message.trim(), timestamp: Date.now() }]);
     setMessage('');
     window.dispatchEvent(new Event('sendMessage'));
   };
