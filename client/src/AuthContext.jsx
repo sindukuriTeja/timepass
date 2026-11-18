@@ -9,6 +9,7 @@ const API_URL = import.meta.env.DEV ? 'http://localhost:5000' : '';
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [socket, setSocket] = useState(null);
+  const [socketConnected, setSocketConnected] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
@@ -17,18 +18,39 @@ export function AuthProvider({ children }) {
 
   // Initialize socket connection
   useEffect(() => {
-    const newSocket = io(API_URL, { transports: ['websocket', 'polling'] });
+    const newSocket = io(API_URL, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+    });
     setSocket(newSocket);
+
+    newSocket.on('connect', () => {
+      setSocketConnected(true);
+      console.log('Socket connected:', newSocket.id);
+    });
+
+    newSocket.on('disconnect', () => {
+      setSocketConnected(false);
+      console.log('Socket disconnected');
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err.message);
+    });
 
     newSocket.on('user-list-update', (list) => {
       setOnlineUsers(list);
     });
 
     newSocket.on('chat-request', (data) => {
+      console.log('Chat request received:', data);
       setNotifications((prev) => [...prev, { type: 'request', ...data }]);
     });
 
     newSocket.on('chat-started', (data) => {
+      console.log('Chat started:', data);
       setActiveChat(data.chatId);
       setChatPartner(data.partner);
     });
@@ -38,7 +60,6 @@ export function AuthProvider({ children }) {
     });
 
     newSocket.on('new-message', (msg) => {
-      // Just notify that a message arrived; ChatPage manages its own message list
       setActiveChat((prev) => prev);
     });
 
@@ -47,7 +68,9 @@ export function AuthProvider({ children }) {
       setChatPartner(null);
     });
 
-    return () => newSocket.close();
+    return () => {
+      newSocket.close();
+    };
   }, []);
 
   // Set profile on socket when user sets it
@@ -80,27 +103,41 @@ export function AuthProvider({ children }) {
   };
 
   const sendChatRequest = (targetSocketId) => {
-    if (socket) socket.emit('send-chat-request', targetSocketId);
+    if (socket && socketConnected) {
+      console.log('Sending chat request to:', targetSocketId);
+      socket.emit('send-chat-request', targetSocketId);
+    } else {
+      console.error('Socket not connected, cannot send chat request');
+    }
   };
 
   const acceptChat = (fromSocketId) => {
-    if (socket) socket.emit('accept-chat', fromSocketId);
+    if (socket && socketConnected) {
+      console.log('Accepting chat from:', fromSocketId);
+      socket.emit('accept-chat', fromSocketId);
+    } else {
+      console.error('Socket not connected, cannot accept chat');
+    }
     setNotifications((prev) => prev.filter((n) => n.fromSocketId !== fromSocketId));
   };
 
   const declineChat = (fromSocketId) => {
-    if (socket) socket.emit('decline-chat', fromSocketId);
+    if (socket && socketConnected) {
+      socket.emit('decline-chat', fromSocketId);
+    }
     setNotifications((prev) => prev.filter((n) => n.fromSocketId !== fromSocketId));
   };
 
   const sendMessage = (message) => {
-    if (socket && activeChat && user) {
+    if (socket && socketConnected && activeChat && user) {
       socket.emit('send-message', { chatId: activeChat, message });
     }
   };
 
   const exitChat = () => {
-    if (socket) socket.emit('exit-chat');
+    if (socket && socketConnected) {
+      socket.emit('exit-chat');
+    }
     setActiveChat(null);
     setChatPartner(null);
   };
