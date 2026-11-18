@@ -157,9 +157,10 @@ function Footer() {
       <div className="logo" style={{ justifyContent: 'center', color: '#fff' }}>
         <Logo /> Timepass
       </div>
-      <h3 style={{ marginTop: '14px' }}>Timepass Pvt. Ltd.</h3>
-      <p>[Street address], [City], [State] – [PIN]<br />hello@timepass.app</p>
-      <small>© 2026 Timepass. All rights reserved.</small>
+      <h2 className="company-name">Timepass Pvt. Limited</h2>
+      <p className="company-alliance">An alliance of <span className="alliance-highlight">BG Groups</span></p>
+      <p className="company-address">[Street address], [City], [State] – [PIN]<br />hello@timepass.app</p>
+      <small>© 2026 Timepass Pvt. Limited. All rights reserved.</small>
     </div>
   );
 }
