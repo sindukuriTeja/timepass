@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -15,10 +16,48 @@ app.use(cors());
 app.use(express.json());
 
 // Serve static files from client build in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/dist')));
+const CLIENT_BUILD_PATH = path.join(__dirname, '../client/dist');
+const CLIENT_INDEX = path.join(CLIENT_BUILD_PATH, 'index.html');
+const buildExists = process.env.NODE_ENV === 'production' && fs.existsSync(CLIENT_INDEX);
+
+if (buildExists) {
+  app.use(express.static(CLIENT_BUILD_PATH));
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
+    res.sendFile(CLIENT_INDEX);
+  });
+} else if (process.env.NODE_ENV === 'production') {
+  // Fallback if build is missing (e.g. build failed or wasn't run)
+  app.get('*', (req, res) => {
+    res.status(503).send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Timepass - Building...</title>
+        <link href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Caveat:wght@700&family=Nunito:wght@500;700&display=swap" rel="stylesheet">
+        <style>
+          body{margin:0;min-height:100vh;display:grid;place-items:center;
+            background:linear-gradient(160deg,#ff8fb1,#ff5c8a 55%,#c2185b);color:#fff;
+            font-family:'Nunito',sans-serif;text-align:center;padding:20px}
+          h1{font-family:'Bagel Fat One';font-size:clamp(32px,6vw,56px);
+            text-shadow:0 4px 0 rgba(122,31,77,.35)}
+          p{font-family:'Caveat';font-size:24px;opacity:.9;margin-top:12px}
+          .spinner{width:44px;height:44px;border:4px solid rgba(255,255,255,.3);
+            border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;
+            margin:24px auto 0}
+          @keyframes spin{to{transform:rotate(360deg)}}
+        </style>
+      </head>
+      <body>
+        <div>
+          <h1>Timepass</h1>
+          <p>Building the frontend… please wait a moment, then refresh 💕</p>
+          <div class="spinner"></div>
+        </div>
+      </body>
+      </html>
+    `);
   });
 }
 
