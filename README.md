@@ -235,6 +235,45 @@ PORT=8080 npm start
 
 ---
 
+## 🚀 Deploy to Render
+
+The project is already set up for Render deployment with `render.yaml` and `Procfile`.
+
+### Option 1: Render Blueprint (Recommended — One Click)
+
+1. Go to [https://render.com/blueprints](https://render.com/blueprints)
+2. Click **"Deploy Full Stack"**
+3. Connect your GitHub account and authorize Render
+4. Select the `sindukuriTeja/timepass` repository
+5. Click **"Deploy Blueprint"**
+6. Render will automatically build and deploy both the backend and frontend as a single web service.
+
+### Option 2: Manual Web Service Setup
+
+1. Go to [https://render.com](https://render.com) and sign in with GitHub
+2. Click **"New +"** → **"Web Service"**
+3. Connect the `sindukuriTeja/timepass` repository
+4. Configure:
+   - **Name:** `timepass`
+   - **Environment:** `Node`
+   - **Build Command:** `npm ci && cd client && npm ci && npm run build && cd ..`
+   - **Start Command:** `npm start`
+   - **Instance Type:** Free
+5. Add Environment Variables:
+   - `NODE_ENV` = `production`
+   - `PORT` = `10000`
+6. Click **"Create Web Service"**
+
+Render will build and deploy your app. The URL will be `https://timepass.onrender.com` (or similar).
+
+### Notes
+
+- The free tier spins down after 15 minutes of inactivity (first request may take ~30s to wake up).
+- Chat data is stored in memory — it resets on every deploy/restart. For persistence, integrate a database (e.g., MongoDB Atlas).
+- Socket.io works over WebSocket on Render; the client falls back to polling if needed.
+
+---
+
 ## 📄 License
 
 MIT — Made with 💕 for fun.
