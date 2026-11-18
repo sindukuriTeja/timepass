@@ -119,7 +119,7 @@ export default function Dashboard() {
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       <Splash />
       <div className="appbar">
-        <div className="logo" onClick={() => setShowConnect(false)} style={{ cursor: 'pointer' }}>
+        <div className="logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
           <Logo /> Timepass
         </div>
         <div className="mid">

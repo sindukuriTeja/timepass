@@ -14,18 +14,25 @@ function ProtectedRoute({ children }) {
 function AppRoutes() {
   const { user, activeChat } = useAuth();
 
+  // Chat page takes priority when a chat is active
   if (activeChat) {
     return <ChatPage />;
   }
 
+  // No user yet → force profile setup
   if (!user) {
     return <ProfileSetup />;
   }
 
+  // User exists → normal routes
   return (
     <Routes>
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/home" element={<Dashboard />} />
+      <Route path="/" element={<Home />} />
+      <Route path="/app" element={
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      } />
     </Routes>
   );
 }
