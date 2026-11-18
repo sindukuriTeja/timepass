@@ -7,12 +7,12 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [keyHash, setKeyHash] = useState(null);
   const [socket, setSocket] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [chatPartner, setChatPartner] = useState(null);
+  const [profileSetup, setProfileSetup] = useState(false);
 
   // Initialize socket connection
   useEffect(() => {
@@ -48,94 +48,52 @@ export function AuthProvider({ children }) {
     return () => newSocket.close();
   }, []);
 
-  // Register with socket when user logs in
+  // Set profile on socket when user sets it
   useEffect(() => {
-    if (socket && keyHash) {
-      socket.emit('register', keyHash);
+    if (socket && user) {
+      socket.emit('set-profile', { username: user.username, gender: user.gender });
     }
-  }, [socket, keyHash]);
+  }, [socket, user]);
 
-  const login = async (accessKey) => {
-    const res = await fetch(`${API_URL}/api/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accessKey }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      setUser({ username: data.username, gender: data.gender });
-      setKeyHash(data.keyHash);
-      return { success: true };
-    }
-    return { success: false, error: data.error };
+  // Set profile (username + gender) — replaces login/signup
+  const setProfile = (username, gender) => {
+    setUser({ username, gender });
+    setProfileSetup(true);
   };
 
-  const signup = async (username, gender, accessKey) => {
-    const res = await fetch(`${API_URL}/api/signup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, gender, accessKey }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      return { success: true };
-    }
-    return { success: false, error: data.error };
-  };
-
+  // Logout — clears profile and disconnects socket
   const logout = () => {
     if (socket) socket.emit('exit-chat');
     setUser(null);
-    setKeyHash(null);
     setActiveChat(null);
     setChatPartner(null);
     setNotifications([]);
+    setProfileSetup(false);
   };
 
-  const updateProfile = async (username, gender) => {
-    const res = await fetch(`${API_URL}/api/update-profile`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ keyHash, username, gender }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      setUser({ username: data.username, gender: data.gender });
-      return { success: true };
-    }
-    return { success: false, error: data.error };
+  // Update profile info
+  const updateProfile = (username, gender) => {
+    setUser({ username, gender });
+    return { success: true };
   };
 
-  const changeKey = async (oldKey, newKey) => {
-    const res = await fetch(`${API_URL}/api/change-key`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ oldKey, newKey, keyHash }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      return { success: true };
-    }
-    return { success: false, error: data.error };
+  const sendChatRequest = (targetSocketId) => {
+    if (socket) socket.emit('send-chat-request', targetSocketId);
   };
 
-  const sendChatRequest = (targetKeyHash) => {
-    if (socket) socket.emit('send-chat-request', targetKeyHash);
+  const acceptChat = (fromSocketId) => {
+    if (socket) socket.emit('accept-chat', fromSocketId);
+    setNotifications((prev) => prev.filter((n) => n.fromSocketId !== fromSocketId));
   };
 
-  const acceptChat = (fromKeyHash) => {
-    if (socket) socket.emit('accept-chat', fromKeyHash);
-    setNotifications((prev) => prev.filter((n) => n.fromKeyHash !== fromKeyHash));
-  };
-
-  const declineChat = (fromKeyHash) => {
-    if (socket) socket.emit('decline-chat', fromKeyHash);
-    setNotifications((prev) => prev.filter((n) => n.fromKeyHash !== fromKeyHash));
+  const declineChat = (fromSocketId) => {
+    if (socket) socket.emit('decline-chat', fromSocketId);
+    setNotifications((prev) => prev.filter((n) => n.fromSocketId !== fromSocketId));
   };
 
   const sendMessage = (message) => {
-    if (socket && activeChat && keyHash) {
-      socket.emit('send-message', { chatId: activeChat, message, senderKeyHash: keyHash });
+    if (socket && activeChat && user) {
+      socket.emit('send-message', { chatId: activeChat, message });
     }
   };
 
@@ -153,17 +111,15 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{
         user,
-        keyHash,
         socket,
         onlineUsers,
         notifications,
         activeChat,
         chatPartner,
-        login,
-        signup,
+        profileSetup,
+        setProfile,
         logout,
         updateProfile,
-        changeKey,
         sendChatRequest,
         acceptChat,
         declineChat,

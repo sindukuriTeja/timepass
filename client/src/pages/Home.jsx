@@ -18,7 +18,7 @@ function Navbar() {
       <div className="logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
         <Logo /> Timepass
       </div>
-      <button className="btn" onClick={() => navigate('/login')}>
+      <button className="btn" onClick={() => navigate('/setup')}>
         💬 Chat
       </button>
     </nav>
@@ -39,7 +39,7 @@ function Hero() {
       <div>
         <h1>From Random Hellos<br />to Unexpected Hearts.</h1>
         <p className="hand">Say hi to a stranger. Who knows what happens next?</p>
-        <button className="btn glow" onClick={() => window.location.href = '/login'}>
+        <button className="btn glow" onClick={() => window.location.href = '/setup'}>
           Start chatting 💌
         </button>
       </div>
@@ -49,10 +49,10 @@ function Hero() {
 
 function HowToUse() {
   const steps = [
-    { icon: '📝', title: 'Sign up', desc: 'Pick a name and a secret access key.' },
-    { icon: '🔑', title: 'Log in', desc: 'Use only your access key next time.' },
+    { icon: '📝', title: 'Pick a name', desc: 'Choose a username and gender.' },
     { icon: '🔗', title: 'Connect', desc: 'Browse people online right now.' },
     { icon: '💬', title: 'Chat', desc: 'Type or talk with the mic.' },
+    { icon: '💕', title: 'Spark', desc: 'Find that unexpected connection.' },
     { icon: '👋', title: 'Exit', desc: 'Chat vanishes when you leave.' },
   ];
   return (

@@ -48,10 +48,10 @@ function NotificationBell() {
             <div key={i}>
               <b>{n.from}</b> wants to connect 💌
               <div className="row">
-                <button className="btn" onClick={() => { acceptChat(n.fromKeyHash); setOpen(false); }}>
+                <button className="btn" onClick={() => { acceptChat(n.fromSocketId); setOpen(false); }}>
                   Accept
                 </button>
-                <button className="btn out" onClick={() => { declineChat(n.fromKeyHash); setOpen(false); }}>
+                <button className="btn out" onClick={() => { declineChat(n.fromSocketId); setOpen(false); }}>
                   Decline
                 </button>
               </div>
@@ -103,7 +103,7 @@ export default function Dashboard() {
       clearTimeout(idleTimer);
       idleTimer = setTimeout(() => {
         logout();
-        navigate('/');
+        navigate('/setup');
       }, IDLE_TIMEOUT);
     };
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];

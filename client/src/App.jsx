@@ -2,14 +2,13 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import Home from './pages/Home';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import ChatPage from './pages/ChatPage';
+import ProfileSetup from './pages/ProfileSetup';
 
 function ProtectedRoute({ children }) {
   const { user } = useAuth();
-  return user ? children : <Navigate to="/login" replace />;
+  return user ? children : <Navigate to="/setup" replace />;
 }
 
 function AppRoutes() {
@@ -19,19 +18,14 @@ function AppRoutes() {
     return <ChatPage />;
   }
 
+  if (!user) {
+    return <ProfileSetup />;
+  }
+
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
-      <Route path="/signup" element={user ? <Navigate to="/dashboard" replace /> : <Signup />} />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/home" element={<Dashboard />} />
     </Routes>
   );
 }

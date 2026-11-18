@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
 
@@ -26,7 +25,6 @@ if (buildExists) {
     res.sendFile(CLIENT_INDEX);
   });
 } else if (process.env.NODE_ENV === 'production') {
-  // Fallback if build is missing (e.g. build failed or wasn't run)
   app.get('*', (req, res) => {
     res.status(503).send(`
       <!DOCTYPE html>
@@ -61,249 +59,143 @@ if (buildExists) {
   });
 }
 
-// In-memory data stores
-const users = new Map();      // keyHash -> { username, gender, socketId, online, keyHash }
-const accessKeys = new Map(); // rawKey -> keyHash (for duplicate check)
-const chats = new Map();      // "hash1:hash2" -> [messages]
-const chatRequests = new Map(); // socketId -> { from, fromKeyHash }
-const userSockets = new Map(); // socketId -> keyHash
+// In-memory data stores — users tracked by socketId only, no access keys
+const users = new Map();      // socketId -> { username, gender, online, chatId, chatPartner }
+const chats = new Map();      // "socketId1:socketId2" -> [messages]
+const chatRequests = new Map(); // socketId -> { from, fromSocketId }
 
-async function hashKey(key) {
-  return bcrypt.hash(key, 10);
+function setUser(socketId, data) {
+  const existing = users.get(socketId) || { username: null, gender: null, online: false };
+  users.set(socketId, { ...existing, ...data, online: true });
 }
 
-async function compareKey(key, hash) {
-  return bcrypt.compare(key, hash);
-}
-
-app.post('/api/signup', async (req, res) => {
-  try {
-    const { username, gender, accessKey } = req.body;
-    if (!username || !gender || !accessKey) {
-      return res.status(400).json({ error: 'All fields are required' });
-    }
-    if (accessKey.length > 64) {
-      return res.status(400).json({ error: 'Access key too long (max 64 chars)' });
-    }
-    if (accessKeys.has(accessKey)) {
-      return res.status(409).json({ error: 'Access key already taken' });
-    }
-    const keyHash = await hashKey(accessKey);
-    accessKeys.set(accessKey, keyHash);
-    users.set(keyHash, { username, gender, socketId: null, online: false, keyHash });
-    res.json({ success: true, message: 'Signup successful' });
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-app.post('/api/login', async (req, res) => {
-  try {
-    const { accessKey } = req.body;
-    if (!accessKey) {
-      return res.status(400).json({ error: 'Access key is required' });
-    }
-    const keyHash = accessKeys.get(accessKey);
-    if (!keyHash) {
-      return res.status(401).json({ error: 'Invalid access key' });
-    }
-    const user = users.get(keyHash);
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid access key' });
-    }
-    res.json({ success: true, username: user.username, gender: user.gender, keyHash });
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-app.post('/api/change-key', async (req, res) => {
-  try {
-    const { oldKey, newKey, keyHash } = req.body;
-    if (!oldKey || !newKey) {
-      return res.status(400).json({ error: 'Both keys required' });
-    }
-    if (newKey.length > 64) {
-      return res.status(400).json({ error: 'New key too long (max 64 chars)' });
-    }
-    if (accessKeys.has(newKey)) {
-      return res.status(409).json({ error: 'New access key already taken' });
-    }
-    const valid = await compareKey(oldKey, keyHash);
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid current key' });
-    }
-    const user = users.get(keyHash);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    // Remove old key mapping
-    accessKeys.delete(oldKey);
-    // Add new key
-    const newHash = await hashKey(newKey);
-    accessKeys.set(newKey, newHash);
-    // Update user reference
-    users.delete(keyHash);
-    user.keyHash = newHash;
-    users.set(newHash, user);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-app.post('/api/update-profile', (req, res) => {
-  try {
-    const { keyHash, username, gender } = req.body;
-    const user = users.get(keyHash);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    if (username) user.username = username;
-    if (gender) user.gender = gender;
-    res.json({ success: true, username: user.username, gender: user.gender });
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-app.get('/api/available-users/:keyHash', (req, res) => {
-  try {
-    const { keyHash } = req.params;
-    const currentUser = users.get(keyHash);
-    if (!currentUser) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    const available = [];
-    users.forEach((user, hash) => {
-      if (hash === keyHash) return;
-      if (!user.online) return;
-      if (currentUser.gender === 'Others') {
-        available.push({ username: user.username, gender: user.gender, keyHash: hash });
-      } else if (user.gender !== currentUser.gender) {
-        available.push({ username: user.username, gender: user.gender, keyHash: hash });
-      }
-    });
-    res.json(available);
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-io.on('connection', (socket) => {
-  let currentKeyHash = null;
-
-  socket.on('register', (keyHash) => {
-    currentKeyHash = keyHash;
-    userSockets.set(socket.id, keyHash);
-    const user = users.get(keyHash);
-    if (user) {
-      user.socketId = socket.id;
-      user.online = true;
-      io.emit('user-list-update', getOnlineUsersList());
-    }
-  });
-
-  socket.on('send-chat-request', (targetKeyHash) => {
-    const sender = users.get(currentKeyHash);
-    const receiver = users.get(targetKeyHash);
-    if (sender && receiver && receiver.socketId) {
-      chatRequests.set(receiver.socketId, { from: sender.username, fromKeyHash: currentKeyHash });
-      io.to(receiver.socketId).emit('chat-request', { from: sender.username, fromKeyHash: currentKeyHash });
-    }
-  });
-
-  socket.on('accept-chat', (fromKeyHash) => {
-    const sender = users.get(fromKeyHash);
-    const receiver = users.get(currentKeyHash);
-    if (sender && receiver) {
-      const chatId = getChatId(currentKeyHash, fromKeyHash);
-      sender.chatId = chatId;
-      receiver.chatId = chatId;
-      sender.chatPartner = currentKeyHash;
-      receiver.chatPartner = fromKeyHash;
-      if (sender.socketId) io.to(sender.socketId).emit('chat-started', { partner: receiver.username, chatId });
-      if (receiver.socketId) io.to(receiver.socketId).emit('chat-started', { partner: sender.username, chatId });
-    }
-  });
-
-  socket.on('decline-chat', (fromKeyHash) => {
-    const sender = users.get(fromKeyHash);
-    if (sender && sender.socketId) {
-      io.to(sender.socketId).emit('chat-declined');
-    }
-  });
-
-  socket.on('send-message', (data) => {
-    const { chatId, message, senderKeyHash } = data;
-    const sender = users.get(senderKeyHash);
-    const allUsers = Array.from(users.values());
-    const partner = allUsers.find(u => u.chatId === chatId && u.keyHash !== senderKeyHash);
-    if (sender && partner && partner.socketId) {
-      const msg = {
-        sender: sender.username,
-        text: message,
-        timestamp: Date.now()
-      };
-      if (!chats.has(chatId)) chats.set(chatId, []);
-      chats.get(chatId).push(msg);
-      io.to(partner.socketId).emit('new-message', msg);
-      if (sender.socketId) io.to(sender.socketId).emit('new-message', msg);
-    }
-  });
-
-  socket.on('exit-chat', () => {
-    const user = users.get(currentKeyHash);
-    if (user && user.chatId) {
-      const allUsers = Array.from(users.values());
-      const partner = allUsers.find(u => u.chatId === user.chatId && u.keyHash !== currentKeyHash);
-      if (partner && partner.socketId) {
-        io.to(partner.socketId).emit('chat-exited');
-      }
-      chats.delete(user.chatId);
-      user.chatId = null;
-      user.chatPartner = null;
-      if (user.socketId) io.to(user.socketId).emit('chat-exited');
-    }
-  });
-
-  socket.on('disconnect', () => {
-    if (currentKeyHash) {
-      const user = users.get(currentKeyHash);
-      if (user) {
-        user.online = false;
-        user.socketId = null;
-        if (user.chatId) {
-          const allUsers = Array.from(users.values());
-          const partner = allUsers.find(u => u.chatId === user.chatId && u.keyHash !== currentKeyHash);
-          if (partner) {
-            partner.chatId = null;
-            partner.chatPartner = null;
-          }
-          chats.delete(user.chatId);
-        }
-      }
-      userSockets.delete(socket.id);
-      io.emit('user-list-update', getOnlineUsersList());
-    }
-  });
-});
-
-function getChatId(hash1, hash2) {
-  return [hash1, hash2].sort().join(':');
+function getUser(socketId) {
+  return users.get(socketId);
 }
 
 function getOnlineUsersList() {
   const list = [];
-  users.forEach((user) => {
-    if (user.online) {
-      list.push({ username: user.username, gender: user.gender });
+  users.forEach((user, socketId) => {
+    if (user.online && user.username) {
+      list.push({ username: user.username, gender: user.gender, socketId });
     }
   });
   return list;
 }
 
-const PORT = process.env.PORT || 5000;
+function findSocketByUser(userObj) {
+  for (const [sid, u] of users) {
+    if (u === userObj) return sid;
+  }
+  return null;
+}
+
+function getChatId(id1, id2) {
+  return [id1, id2].sort().join(':');
+}
+
+// Socket.io handling
+io.on('connection', (socket) => {
+  // Initialize user record
+  setUser(socket.id, { username: null, gender: null });
+
+  // Set profile (username + gender) — no access key needed
+  socket.on('set-profile', (data) => {
+    const { username, gender } = data;
+    if (username && gender) {
+      setUser(socket.id, { username, gender });
+      io.emit('user-list-update', getOnlineUsersList());
+    }
+  });
+
+  // Send chat request to another user
+  socket.on('send-chat-request', (targetSocketId) => {
+    const sender = users.get(socket.id);
+    const receiver = users.get(targetSocketId);
+    if (sender && receiver && receiver.online && receiver.username) {
+      chatRequests.set(targetSocketId, { from: sender.username, fromSocketId: socket.id });
+      io.to(targetSocketId).emit('chat-request', { from: sender.username, fromSocketId: socket.id });
+    }
+  });
+
+  // Accept chat request
+  socket.on('accept-chat', (fromSocketId) => {
+    const sender = users.get(fromSocketId);
+    const receiver = users.get(socket.id);
+    if (sender && receiver) {
+      const chatId = getChatId(socket.id, fromSocketId);
+      sender.chatId = chatId;
+      receiver.chatId = chatId;
+      sender.chatPartner = socket.id;
+      receiver.chatPartner = fromSocketId;
+      io.to(fromSocketId).emit('chat-started', { partner: receiver.username, chatId });
+      io.to(socket.id).emit('chat-started', { partner: sender.username, chatId });
+    }
+  });
+
+  // Decline chat request
+  socket.on('decline-chat', (fromSocketId) => {
+    const sender = users.get(fromSocketId);
+    if (sender && sender.online) {
+      io.to(fromSocketId).emit('chat-declined');
+    }
+  });
+
+  // Send message
+  socket.on('send-message', (data) => {
+    const { chatId, message } = data;
+    const sender = users.get(socket.id);
+    if (!sender || !sender.chatId) return;
+    // Find partner in this chat
+    const partnerSocketId = sender.chatPartner;
+    const partner = users.get(partnerSocketId);
+    if (partner && partner.online) {
+      const msg = { sender: sender.username, text: message, timestamp: Date.now() };
+      if (!chats.has(chatId)) chats.set(chatId, []);
+      chats.get(chatId).push(msg);
+      io.to(partnerSocketId).emit('new-message', msg);
+      io.to(socket.id).emit('new-message', msg);
+    }
+  });
+
+  // Exit chat — delete messages for both
+  socket.on('exit-chat', () => {
+    const user = users.get(socket.id);
+    if (user && user.chatId) {
+      const partnerSocketId = user.chatPartner;
+      const partner = users.get(partnerSocketId);
+      if (partner) {
+        partner.chatId = null;
+        partner.chatPartner = null;
+        io.to(partnerSocketId).emit('chat-exited');
+      }
+      chats.delete(user.chatId);
+      user.chatId = null;
+      user.chatPartner = null;
+      io.to(socket.id).emit('chat-exited');
+    }
+  });
+
+  // Disconnect
+  socket.on('disconnect', () => {
+    const user = users.get(socket.id);
+    if (user) {
+      if (user.chatId) {
+        const partnerSocketId = user.chatPartner;
+        const partner = users.get(partnerSocketId);
+        if (partner) {
+          partner.chatId = null;
+          partner.chatPartner = null;
+        }
+        chats.delete(user.chatId);
+      }
+      user.online = false;
+    }
+    io.emit('user-list-update', getOnlineUsersList());
+  });
+});
+
+const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
   console.log(`Timepass server running on port ${PORT}`);
 });
