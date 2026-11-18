@@ -30,7 +30,7 @@ export default function ProfileSetup() {
       return;
     }
     setProfile(username.trim(), gender);
-    navigate('/');
+    navigate('/app');
   };
 
   return (

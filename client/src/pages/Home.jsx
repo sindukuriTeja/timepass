@@ -18,7 +18,7 @@ function Navbar() {
       <div className="logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
         <Logo /> Timepass
       </div>
-      <button className="btn" onClick={() => navigate('/setup')}>
+      <button className="btn" onClick={() => navigate('/app')}>
         💬 Chat
       </button>
     </nav>
@@ -39,7 +39,7 @@ function Hero() {
       <div>
         <h1>From Random Hellos<br />to Unexpected Hearts.</h1>
         <p className="hand">Say hi to a stranger. Who knows what happens next?</p>
-        <button className="btn glow" onClick={() => window.location.href = '/setup'}>
+        <button className="btn glow" onClick={() => window.location.href = '/app'}>
           Start chatting 💌
         </button>
       </div>
