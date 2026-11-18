@@ -15,14 +15,13 @@ A real-time chat platform where strangers connect and chat. Playful, romantic, a
 
 - **🎨 Romantic Design** — Blush pink, coral, rose red, soft purple & sunset gold with gradients throughout
 - **💬 Real-time Chat** — Instant messaging with Socket.io
-- **🔐 Access Key Auth** — Sign up with username, gender & a secret access key. Login with just the key
+- **🚀 No Login Required** — Just pick a username and gender, then start chatting instantly
 - **🤝 Smart Matching** — Male sees female, female sees male, others see everyone
 - **🎤 Voice to Text** — Web Speech API integration
 - **🔔 Chat Requests** — Accept/Decline notifications
 - **🗑️ Auto Deletion** — Chats deleted on exit, logout, or browser close
 - **⏱️ Idle Timeout** — Auto-logout after 5 hours of inactivity
 - **📱 Fully Responsive** — Works on mobile, tablet & desktop
-- **🔒 Secure** — Access keys hashed with bcrypt, never stored in plain text
 
 ---
 
@@ -34,7 +33,6 @@ A real-time chat platform where strangers connect and chat. Playful, romantic, a
 | Styling | Custom CSS with animations |
 | Backend | Node.js + Express |
 | Real-time | Socket.io |
-| Security | bcryptjs |
 
 ---
 
@@ -59,7 +57,7 @@ timepass/
 │       └── pages/
 │           ├── Home.jsx
 │           ├── Login.jsx
-│           ├── Signup.jsx
+│           ├── ProfileSetup.jsx
 │           ├── Dashboard.jsx
 │           └── ChatPage.jsx
 ├── package.json
@@ -132,32 +130,29 @@ Navigate to **http://localhost:3000**
 ### For Testing (Multiple Users)
 
 1. Open **two browser windows** (or one regular + one incognito)
-2. **Window 1:** Go to `/signup` → Create a user (e.g., "Alice", Female, key "alice123")
-3. **Window 2:** Go to `/signup` → Create another user (e.g., "Bob", Male, key "bob456")
-4. **Window 1:** Login with "alice123"
-5. **Window 2:** Login with "bob456"
-6. Both users will see each other in the Connect screen
-7. Click **Chat** → Accept the request → Start chatting!
+2. **Window 1:** Go to `/setup` → Pick username "Alice", Gender Female → Start Chatting
+3. **Window 2:** Go to `/setup` → Pick username "Bob", Gender Male → Start Chatting
+4. Both users will see each other in the Connect screen
+5. Click **Chat** → Accept the request → Start chatting!
 
 ### User Flow
 
 1. **Home Page** → Click "Chat" or "Start Chatting"
-2. **Sign Up** (first time) → Username, Gender, Access Key
-3. **Login** → Enter your access key
-4. **"Privacy is Power" splash** appears for 5 seconds
-5. **Dashboard** → Click "Connect" to see online users
-6. **Send Chat Request** → Wait for acceptance
-7. **Chat** → Message, use mic for voice, or Exit
-8. **Exit** → All messages deleted for both users
+2. **Profile Setup** → Pick a username and gender (no login needed!)
+3. **"Privacy is Power" splash** appears for 5 seconds
+4. **Dashboard** → Click "Connect" to see online users
+5. **Send Chat Request** → Wait for acceptance
+6. **Chat** → Message, use mic for voice, or Exit
+7. **Exit** → All messages deleted for both users
 
 ---
 
-## 🔐 Security Notes
+## 🔐 Privacy Notes
 
-- Access keys are **hashed with bcrypt** before storage
-- Keys are **never logged or exposed**
-- Duplicate keys are **rejected** at signup
-- Chat data lives **only in memory** — nothing persists after logout/close
+- No login, no email, no phone required — just a username and gender
+- Chat data lives **only in memory** — nothing persists after exit/logout/close
+- Chats are permanently deleted for both users when either clicks Exit
+- Auto-logout after 5 hours of inactivity clears all chat data
 - Input is validated on both client and server
 
 ---
@@ -174,15 +169,24 @@ Navigate to **http://localhost:3000**
 
 ---
 
-## 📝 API Endpoints
+## 📡 Socket.io Events
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/signup` | Create new user |
-| POST | `/api/login` | Login with access key |
-| POST | `/api/change-key` | Change access key |
-| POST | `/api/update-profile` | Update username/gender |
-| GET | `/api/available-users/:keyHash` | Get online matching users |
+All communication happens over Socket.io (no REST endpoints needed):
+
+| Event | Direction | Description |
+|-------|-----------|-------------|
+| `set-profile` | Client → Server | Set username + gender |
+| `send-chat-request` | Client → Server | Request to chat with a user |
+| `accept-chat` | Client → Server | Accept a chat request |
+| `decline-chat` | Client → Server | Decline a chat request |
+| `send-message` | Client → Server | Send a chat message |
+| `exit-chat` | Client → Server | End chat, delete messages |
+| `user-list-update` | Server → Client | Online user list changed |
+| `chat-request` | Server → Client | Someone wants to connect |
+| `chat-started` | Server → Client | Chat accepted, session open |
+| `chat-declined` | Server → Client | Chat request was declined |
+| `new-message` | Server → Client | New message received |
+| `chat-exited` | Server → Client | Chat ended by partner |
 
 ---
 
