@@ -159,7 +159,7 @@ function Footer() {
       </div>
       <h2 className="company-name">Timepass Pvt. Limited</h2>
       <p className="company-alliance">An alliance of <span className="alliance-highlight">BG Groups</span></p>
-      <p className="company-address">[Street address], [City], [State] – [PIN]<br />hello@timepass.app</p>
+      <p className="company-address">20 Cooper Square, New York, NY 80066<br />hello@timepass.app</p>
       <small>© 2026 Timepass Pvt. Limited. All rights reserved.</small>
     </div>
   );
